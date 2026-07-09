@@ -1,48 +1,44 @@
 # 🏛️ DMS Administrasi PNS
 
-Sistem Manajemen Dokumen Administrasi Pegawai Negeri Sipil dengan fitur lengkap untuk instansi pemerintah.
+Sistem Manajemen Dokumen Administrasi Pegawai Negeri Sipil dengan fitur lengkap.
 
-## ✨ Fitur Utama
+## ✨ Fitur
 
-### 👑 Admin Panel
-- 📊 Dashboard dengan statistik sistem
+### 👑 Admin
+- 📊 Dashboard statistik sistem
 - 📁 Lihat semua dokumen dari semua bidang
 - ⏳ Approval dokumen
-- 👥 Manajemen User (CRUD, reset password, nonaktifkan)
-- 🏢 Manajemen Bidang/Departemen
+- 👥 Manajemen User (CRUD, reset password)
+- 🏢 Manajemen Bidang
 - 📂 Manajemen Kategori Dokumen
-- 📜 Audit Log lengkap (untuk audit BPK/Inspektorat)
+- 📜 Audit Log lengkap
 - 📊 Export ke Excel
 
 ### ⭐ Kepala Bidang
 - 📊 Dashboard bidang
 - 📁 Lihat semua dokumen bidang
-- ⏳ Approval dokumen dari anggota bidang
+- ⏳ Approval dokumen dari anggota
 - 📄 Kelola dokumen pribadi
 
-### 👤 PNS (User)
+### 👤 PNS
 - 📊 Dashboard pribadi
-- 📄 Kelola dokumen sendiri (edit, hapus, submit approval)
+- 📄 Kelola dokumen (edit, hapus, submit approval)
 - 🔔 Notifikasi real-time
 - 📤 Upload PDF dengan kategori & tag
-- 📧 Kirim notifikasi via email
 
 ### 🌟 Fitur Umum
 - 🔐 Login/Register berbasis email + NIP
 - 📤 Upload PDF dengan kategori & tag
 - ✅ Approval Workflow (Draft → Pending → Approved/Rejected)
-- 🔍 Pencarian & filter dokumen
-- ⬆️⬇️ Sorting terbaru/terlama
+- 🔍 Pencarian & filter
 - 📧 Kirim PDF otomatis ke email
 - 📝 Audit trail untuk semua aktivitas
-- 📅 Expiry date & reminder
-- 📊 Export laporan ke Excel
+- 📅 Expiry date
 - 🔔 Notifikasi in-app
 
-## 🚀 Deploy ke GitHub & Streamlit Cloud
+## 🚀 Deploy
 
 ### Step 1: Push ke GitHub
-
 ```bash
 git init
 git add .
@@ -53,20 +49,17 @@ git push -u origin main
 ```
 
 ### Step 2: Deploy ke Streamlit Cloud
-
 1. Buka https://share.streamlit.io/
 2. Login dengan GitHub
 3. Klik **New App**
 4. Isi:
-   - **Repository:** `Irvandisihombing14/dms-perusahaan`
-   - **Branch:** `main`
-   - **Main file path:** `app.py`
+   - Repository: `Irvandisihombing14/dms-perusahaan`
+   - Branch: `main`
+   - Main file path: `app.py`
 5. Klik **Deploy**
 
 ### Step 3: Tambahkan Secrets
-
-Di Settings → Secrets, paste:
-
+Di Settings → Secrets:
 ```toml
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -75,15 +68,9 @@ SENDER_PASSWORD = "app_password_16_digit"
 APP_NAME = "DMS Administrasi PNS"
 ```
 
-## 👑 Cara Membuat Admin Pertama
+## 👑 Membuat Admin Pertama
 
-Setelah deploy, buat akun admin dengan cara:
-
-1. Deploy aplikasi terlebih dahulu
-2. Tambahkan minimal 1 bidang di menu "Manajemen Bidang"
-3. Register akun pertama Anda
-4. Buat file `make_admin.py` lokal, lalu jalankan:
-
+Setelah deploy, jalankan script ini sekali:
 ```python
 from database import get_connection
 conn = get_connection()
@@ -92,11 +79,5 @@ conn.commit()
 conn.close()
 ```
 
-**Atau** langsung via SQL di database:
-```sql
-UPDATE users SET role = 'admin' WHERE email = 'email_anda@gmail.com';
-```
-
 ## 📝 Lisensi
-
 MIT License

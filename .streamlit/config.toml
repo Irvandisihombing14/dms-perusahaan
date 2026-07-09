@@ -1,5 +1,15 @@
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SENDER_EMAIL = "emailanda@gmail.com"
-SENDER_PASSWORD = "abcd efgh ijkl mnop"
-APP_NAME = "DMS Perusahaan Saya"
+[server]
+headless = true
+port = 8501
+enableCORS = false
+maxUploadSize = 200
+
+[theme]
+primaryColor = "#1e3a8a"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

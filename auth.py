@@ -8,7 +8,6 @@ from config import ROLE_PNS
 
 
 def hash_password(password, salt=None):
-    """Hash password dengan SHA-256 + salt"""
     if salt is None:
         salt = secrets.token_hex(16)
     password_hash = hashlib.sha256((salt + password).encode()).hexdigest()
@@ -16,7 +15,6 @@ def hash_password(password, salt=None):
 
 
 def verify_password(password, stored_hash):
-    """Verifikasi password"""
     try:
         salt, hash_value = stored_hash.split('$')
         password_hash = hashlib.sha256((salt + password).encode()).hexdigest()
@@ -26,37 +24,25 @@ def verify_password(password, stored_hash):
 
 
 def register(email, password, full_name, nip, department_id, role=ROLE_PNS):
-    """Registrasi user baru"""
     if not email or not password or not full_name:
         return False, "Email, password, dan nama harus diisi!"
-
     if len(password) < 6:
         return False, "Password minimal 6 karakter!"
-
     if '@' not in email:
         return False, "Format email tidak valid!"
-
     password_hash = hash_password(password)
-    return create_user(email.lower().strip(), password_hash, full_name,
-                      nip, department_id, role)
+    return create_user(email.lower().strip(), password_hash, full_name, nip, department_id, role)
 
 
 def login(email, password):
-    """Login user"""
     if not email or not password:
         return None, "Email dan password harus diisi!"
-
     user = get_user_by_email(email.lower().strip())
-
     if user is None:
         return None, "Email tidak terdaftar!"
-
-    # user: (id, email, password_hash, full_name, nip, department_id, role, is_active, created_at, department_name)
-    if user[7] == 0:  # is_active
+    if user[7] == 0:
         return None, "Akun Anda telah dinonaktifkan. Hubungi admin."
-
     stored_hash = user[2]
-
     if verify_password(password, stored_hash):
         user_data = {
             'id': user[0],
@@ -75,15 +61,12 @@ def login(email, password):
 
 
 def is_admin(user_data):
-    """Cek apakah user adalah admin"""
     return user_data and user_data.get('role') == 'admin'
 
 
 def is_kepala_bidang(user_data):
-    """Cek apakah user adalah Kepala Bidang"""
     return user_data and user_data.get('role') == 'kepala_bidang'
 
 
 def can_approve(user_data):
-    """Cek apakah user bisa approve dokumen"""
     return user_data and user_data.get('role') in ['admin', 'kepala_bidang']
