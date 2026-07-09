@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Streamlit Secrets (JANGAN PERNAH COMMIT!)
+.streamlit/secrets.toml
+
+# Environment Variables
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded files
+uploaded_files/*
+!uploaded_files/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
