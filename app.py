@@ -1,18 +1,27 @@
 """
-Aplikasi Utama - Sistem Manajemen Dokumen Online
+Aplikasi Utama - DMS Administrasi PNS
 """
 import streamlit as st
-import pandas as pd
 import os
 from datetime import datetime
 
-from config import DEPARTMENTS, UPLOAD_FOLDER, init_folders
-from database import (
-    init_db, create_document, get_all_documents,
-    get_documents_by_department, get_document_by_id
+from config import (
+    DEPARTMENTS, UPLOAD_FOLDER, init_folders, ROLE_ADMIN, ROLE_KABID, ROLE_PNS,
+    ROLE_LABELS, DOCUMENT_CATEGORIES, STATUS_DRAFT, STATUS_PENDING,
+    STATUS_APPROVED, STATUS_REJECTED, STATUS_LABELS, ITEMS_PER_PAGE
 )
-from auth import register, login
-from email_service import send_pdf_email
+from database import (
+    init_db, create_document, get_all_documents, get_documents_by_department,
+    get_documents_by_user, get_document_by_id, update_document, delete_document_record,
+    create_audit_log, get_all_audit_logs, get_audit_logs_by_user,
+    get_all_departments, get_all_categories, get_department_by_id,
+    get_category_by_id, create_notification, get_notifications,
+    mark_all_notifications_read, count_unread_notifications, approve_document,
+    reject_document, get_approvers_for_department
+)
+from auth import register, login, is_admin, is_kepala_bidang, can_approve
+from email_service import send_pdf_email, send_approval_notification
+from utils import format_file_size, format_date, get_status_badge
 
 # --- INISIALISASI ---
 init_folders()
@@ -20,8 +29,8 @@ init_db()
 
 # --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="DMS Online - Sistem Manajemen Dokumen",
-    page_icon="📂",
+    page_title="DMS Administrasi PNS",
+    page_icon="🏛️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -31,7 +40,7 @@ st.markdown("""
 <style>
     .main-header {
         font-size: 2.5rem;
-        color: #FF4B4B;
+        color: #1e3a8a;
         text-align: center;
         margin-bottom: 1rem;
     }
@@ -41,6 +50,15 @@ st.markdown("""
         text-align: center;
         margin-bottom: 2rem;
     }
+    .notification-badge {
+        background: #dc3545;
+        color: white;
+        border-radius: 50%;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        margin-left: 5px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,14 +66,15 @@ st.markdown("""
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_data = None
+    st.session_state.page = "dashboard"
 
 
 # ============================================================
 # HALAMAN LOGIN / REGISTER
 # ============================================================
 if not st.session_state.logged_in:
-    st.markdown('<h1 class="main-header">📂 DMS Online</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Sistem Manajemen Dokumen Antar Departemen</p>',
+    st.markdown('<h1 class="main-header">🏛️ DMS Administrasi PNS</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Sistem Manajemen Dokumen Administrasi Pegawai Negeri Sipil</p>',
                 unsafe_allow_html=True)
 
     col_left, col_center, col_right = st.columns([1, 2, 1])
@@ -63,11 +82,10 @@ if not st.session_state.logged_in:
     with col_center:
         tab1, tab2 = st.tabs(["🔐 Login", "📝 Registrasi"])
 
-        # --- TAB LOGIN ---
         with tab1:
             with st.form("login_form"):
-                st.subheader("Masuk ke Akun Anda")
-                l_email = st.text_input("📧 Email", placeholder="nama@perusahaan.com")
+                st.subheader("Masuk ke Akun PNS Anda")
+                l_email = st.text_input("📧 Email", placeholder="nama@instansi.go.id")
                 l_pass = st.text_input("🔑 Password", type="password")
                 submit_login = st.form_submit_button("Login", type="primary",
                                                      use_container_width=True)
@@ -78,29 +96,36 @@ if not st.session_state.logged_in:
                         if user_data:
                             st.session_state.logged_in = True
                             st.session_state.user_data = user_data
+                            st.session_state.page = "dashboard"
                             st.success(message)
                             st.rerun()
                         else:
                             st.error(message)
 
-        # --- TAB REGISTER ---
         with tab2:
-            with st.form("register_form"):
-                st.subheader("Buat Akun Baru")
-                r_name = st.text_input("👤 Nama Lengkap")
-                r_email = st.text_input("📧 Email Aktif")
-                r_pass = st.text_input("🔑 Password (min. 6 karakter)", type="password")
-                r_dept = st.selectbox("🏢 Departemen", DEPARTMENTS)
-                submit_register = st.form_submit_button("Daftar", type="primary",
-                                                        use_container_width=True)
+            departments = get_all_departments()
+            if not departments:
+                st.warning("⚠️ Belum ada departemen. Hubungi admin untuk menambahkan departemen terlebih dahulu.")
+            else:
+                with st.form("register_form"):
+                    st.subheader("Daftar Akun PNS Baru")
+                    r_name = st.text_input("👤 Nama Lengkap")
+                    r_nip = st.text_input("🆔 NIP (Nomor Induk Pegawai)")
+                    r_email = st.text_input("📧 Email Instansi")
+                    r_pass = st.text_input("🔑 Password (min. 6 karakter)", type="password")
+                    r_dept = st.selectbox("🏢 Bidang/Departemen",
+                                         [(d[1], d[0]) for d in departments],
+                                         format_func=lambda x: x[0])
+                    submit_register = st.form_submit_button("Daftar", type="primary",
+                                                            use_container_width=True)
 
-                if submit_register:
-                    with st.spinner("Mendaftarkan akun..."):
-                        success, message = register(r_email, r_pass, r_name, r_dept)
-                        if success:
-                            st.success(f"✅ {message} Silakan Login.")
-                        else:
-                            st.error(f"❌ {message}")
+                    if submit_register:
+                        with st.spinner("Mendaftarkan akun..."):
+                            success, message = register(r_email, r_pass, r_name, r_nip, r_dept[1])
+                            if success:
+                                st.success(f"✅ {message} Silakan Login.")
+                            else:
+                                st.error(f"❌ {message}")
 
 
 # ============================================================
@@ -108,201 +133,238 @@ if not st.session_state.logged_in:
 # ============================================================
 else:
     user = st.session_state.user_data
+    admin_mode = is_admin(user)
+    kabid_mode = is_kepala_bidang(user)
 
     # --- SIDEBAR ---
     with st.sidebar:
         st.markdown("### 👤 Profil")
         st.success(f"**{user['full_name']}**")
         st.caption(f"📧 {user['email']}")
-        st.caption(f"🏢 {user['department']}")
+        st.caption(f"🆔 NIP: {user['nip'] or '-'}")
+        st.caption(f"🏢 {user['department_name']}")
+        st.markdown(f'{ROLE_LABELS.get(user["role"], user["role"])}')
+
+        # Notifikasi
+        unread_count = count_unread_notifications(user['email'])
+        if unread_count > 0:
+            st.markdown(f"🔔 **{unread_count}** notifikasi baru")
 
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.user_data = None
+            st.session_state.page = "dashboard"
             st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📋 Menu")
+
+        if admin_mode:
+            if st.button("📊 Dashboard Admin", use_container_width=True):
+                st.session_state.page = "dashboard"
+                st.rerun()
+            if st.button("📁 Semua Dokumen", use_container_width=True):
+                st.session_state.page = "all_docs"
+                st.rerun()
+            if st.button("⏳ Approval Pending", use_container_width=True):
+                st.session_state.page = "approvals"
+                st.rerun()
+            if st.button("👥 Manajemen User", use_container_width=True):
+                st.session_state.page = "users"
+                st.rerun()
+            if st.button("🏢 Manajemen Bidang", use_container_width=True):
+                st.session_state.page = "departments"
+                st.rerun()
+            if st.button("📂 Kategori Dokumen", use_container_width=True):
+                st.session_state.page = "categories"
+                st.rerun()
+            if st.button("📜 Audit Log", use_container_width=True):
+                st.session_state.page = "audit_log"
+                st.rerun()
+        elif kabid_mode:
+            if st.button("📊 Dashboard", use_container_width=True):
+                st.session_state.page = "dashboard"
+                st.rerun()
+            if st.button("📁 Dokumen Bidang", use_container_width=True):
+                st.session_state.page = "dept_docs"
+                st.rerun()
+            if st.button("⏳ Approval Pending", use_container_width=True):
+                st.session_state.page = "approvals"
+                st.rerun()
+            if st.button("📄 Dokumen Saya", use_container_width=True):
+                st.session_state.page = "my_docs"
+                st.rerun()
+        else:
+            if st.button("📊 Dashboard Saya", use_container_width=True):
+                st.session_state.page = "dashboard"
+                st.rerun()
+            if st.button("📄 Dokumen Saya", use_container_width=True):
+                st.session_state.page = "my_docs"
+                st.rerun()
+            if st.button("🔔 Notifikasi", use_container_width=True):
+                st.session_state.page = "notifications"
+                st.rerun()
 
         st.markdown("---")
         st.markdown("### 📤 Upload Dokumen")
 
-        with st.form("upload_form", clear_on_submit=True):
-            uploaded_file = st.file_uploader("Pilih File PDF", type=['pdf'])
-            doc_title = st.text_input("Judul Dokumen",
-                                      placeholder="Contoh: Laporan Q1 2026")
-            send_email = st.checkbox("Kirim notifikasi via email", value=True)
-            recipient_email = st.text_input(
-                "Email Penerima",
-                value=user['email'] if send_email else "",
-                disabled=not send_email
-            )
+        departments = get_all_departments()
+        categories = get_all_categories()
 
-            submit_upload = st.form_submit_button(
-                "📤 Upload & Kirim",
-                type="primary",
-                use_container_width=True
-            )
-
-            if submit_upload:
-                if uploaded_file is None:
-                    st.error("❌ Pilih file PDF terlebih dahulu!")
-                elif not doc_title:
-                    st.error("❌ Judul dokumen harus diisi!")
-                else:
-                    # Generate nama file unik
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    safe_filename = f"{timestamp}_{uploaded_file.name}"
-                    filepath = os.path.join(UPLOAD_FOLDER, safe_filename)
-
-                    # Simpan file fisik
-                    with open(filepath, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-
-                    # Simpan ke database
-                    doc_id = create_document(
-                        title=doc_title,
-                        original_filename=uploaded_file.name,
-                        filepath=filepath,
-                        department=user['department'],
-                        uploaded_by_email=user['email'],
-                        uploaded_by_name=user['full_name'],
-                        upload_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        file_size=uploaded_file.size
-                    )
-
-                    st.success(f"✅ Dokumen berhasil diupload! (ID: {doc_id})")
-
-                    # Kirim email
-                    if send_email and recipient_email:
-                        with st.spinner("Mengirim email..."):
-                            success, message = send_pdf_email(
-                                recipient_email, filepath,
-                                uploaded_file.name, user['full_name'], doc_title
-                            )
-                            if success:
-                                st.success(f"📧 {message}")
-                            else:
-                                st.warning(f"⚠️ {message}")
-
-    # --- MAIN CONTENT ---
-    st.title(f"📂 Arsip Dokumen - {user['department']}")
-
-    # Metrics
-    all_docs = get_all_documents()
-    dept_docs = get_documents_by_department(user['department'])
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("📊 Total Dokumen", len(all_docs))
-    with col2:
-        st.metric("🏢 Dokumen Dept Anda", len(dept_docs))
-    with col3:
-        total_size = sum(doc[8] for doc in all_docs if doc[8]) / (1024 * 1024)
-        st.metric("💾 Total Ukuran", f"{total_size:.2f} MB")
-    with col4:
-        today = datetime.now().strftime("%Y-%m-%d")
-        today_docs = [d for d in all_docs if d[7].startswith(today)]
-        st.metric("📅 Upload Hari Ini", len(today_docs))
-
-    st.markdown("---")
-
-    # --- FILTER & SEARCH ---
-    col_filter1, col_filter2, col_filter3 = st.columns([2, 2, 1])
-
-    with col_filter1:
-        if user['department'] == 'IT':  # Admin bisa lihat semua
-            depts = ["Semua"] + list(set([d[4] for d in all_docs]))
-            selected_dept = st.selectbox("🏢 Filter Departemen", depts)
+        if not departments or not categories:
+            st.warning("⚠️ Hubungi admin untuk setup departemen dan kategori.")
         else:
-            selected_dept = user['department']
-            st.text_input("🏢 Departemen", value=user['department'], disabled=True)
+            with st.form("upload_form", clear_on_submit=True):
+                uploaded_file = st.file_uploader("Pilih File PDF", type=['pdf'])
+                doc_title = st.text_input("Judul Dokumen",
+                                          placeholder="Contoh: Laporan Kinerja Triwulan I")
+                doc_desc = st.text_area("Deskripsi (Opsional)", height=80)
+                doc_category = st.selectbox("Kategori",
+                                           [(c[1], c[0]) for c in categories],
+                                           format_func=lambda x: x[0])
+                doc_tags = st.text_input("Tag (pisahkan dengan koma)",
+                                        placeholder="laporan, kinerja, 2026")
+                doc_expiry = st.date_input("Tanggal Kadaluarsa (Opsional)",
+                                          min_value=datetime.now(),
+                                          value=None)
 
-    with col_filter2:
-        search_term = st.text_input("🔍 Cari Dokumen",
-                                    placeholder="Ketik judul dokumen...")
-
-    with col_filter3:
-        sort_order = st.radio("⬆️⬇️ Urutan",
-                              ["Terbaru", "Terlama"],
-                              horizontal=True)
-
-    # --- DATA PROCESSING ---
-    df = pd.DataFrame(all_docs, columns=[
-        'ID', 'Judul', 'Nama File Asli', 'Path', 'Departemen',
-        'Email Pengunggah', 'Nama Pengunggah', 'Tanggal Upload', 'Ukuran'
-    ])
-
-    if not df.empty:
-        # Filter
-        filtered = df.copy()
-        if selected_dept != "Semua":
-            filtered = filtered[filtered['Departemen'] == selected_dept]
-        if search_term:
-            filtered = filtered[
-                filtered['Judul'].str.contains(search_term, case=False, na=False) |
-                filtered['Nama File Asli'].str.contains(search_term, case=False, na=False)
-            ]
-
-        # Sort
-        filtered = filtered.sort_values(
-            'Tanggal Upload',
-            ascending=(sort_order == "Terlama")
-        )
-
-        # Display
-        if not filtered.empty:
-            display_df = filtered[['ID', 'Judul', 'Departemen', 'Nama Pengunggah',
-                                   'Tanggal Upload', 'Ukuran']].copy()
-            display_df['Ukuran'] = display_df['Ukuran'].apply(
-                lambda x: f"{x / 1024:.1f} KB" if x else "-"
-            )
-            display_df.columns = ['ID', '📄 Judul', '🏢 Dept', '👤 Pengunggah',
-                                  '📅 Tanggal', '💾 Ukuran']
-
-            st.dataframe(
-                display_df,
-                use_container_width=True,
-                hide_index=True,
-                height=400
-            )
-
-            # Download Section
-            st.markdown("---")
-            st.subheader("📥 Download Dokumen")
-
-            col_dl1, col_dl2 = st.columns([2, 1])
-            with col_dl1:
-                doc_options = {f"{row['ID']} - {row['Judul']}": row['ID']
-                               for _, row in filtered.iterrows()}
-                selected_doc = st.selectbox(
-                    "Pilih Dokumen",
-                    options=list(doc_options.keys())
+                send_email = st.checkbox("Kirim notifikasi via email", value=True)
+                recipient_email = st.text_input(
+                    "Email Penerima",
+                    value=user['email'] if send_email else "",
+                    disabled=not send_email
                 )
 
-            with col_dl2:
-                st.write("")
-                st.write("")
-                if st.button("🔄 Muat File", type="secondary",
-                             use_container_width=True):
-                    st.session_state['selected_doc_id'] = doc_options[selected_doc]
-                    st.rerun()
+                submit_upload = st.form_submit_button(
+                    "📤 Upload",
+                    type="primary",
+                    use_container_width=True
+                )
 
-            # Tampilkan tombol download jika file sudah dimuat
-            if 'selected_doc_id' in st.session_state:
-                doc_id = st.session_state['selected_doc_id']
-                doc_info = get_document_by_id(doc_id)
+                if submit_upload:
+                    if uploaded_file is None:
+                        st.error("❌ Pilih file PDF terlebih dahulu!")
+                    elif not doc_title:
+                        st.error("❌ Judul dokumen harus diisi!")
+                    else:
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        safe_filename = f"{timestamp}_{uploaded_file.name}"
+                        filepath = os.path.join(UPLOAD_FOLDER, safe_filename)
 
-                if doc_info and os.path.exists(doc_info[3]):
-                    with open(doc_info[3], "rb") as file:
-                        st.download_button(
-                            label=f"📥 Download: {doc_info[2]}",
-                            data=file.read(),
-                            file_name=doc_info[2],
-                            mime="application/pdf",
-                            type="primary",
-                            use_container_width=True
+                        with open(filepath, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+
+                        # Tentukan status berdasarkan kategori
+                        category_info = get_category_by_id(doc_category[1])
+                        status = STATUS_DRAFT
+                        if category_info and category_info[3] == 1:  # require_approval
+                            status = STATUS_PENDING
+
+                        expiry_date = doc_expiry.strftime("%Y-%m-%d") if doc_expiry else None
+
+                        doc_id = create_document(
+                            title=doc_title,
+                            original_filename=uploaded_file.name,
+                            filepath=filepath,
+                            department_id=user['department_id'],
+                            category_id=doc_category[1],
+                            status=status,
+                            tags=doc_tags,
+                            description=doc_desc,
+                            expiry_date=expiry_date,
+                            uploaded_by_email=user['email'],
+                            uploaded_by_name=user['full_name'],
+                            upload_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            file_size=uploaded_file.size
                         )
-                else:
-                    st.error("❌ File tidak ditemukan di server!")
-        else:
-            st.info("ℹ️ Tidak ada dokumen yang sesuai dengan filter.")
+
+                        # Audit log
+                        create_audit_log(
+                            action="CREATE",
+                            document_id=doc_id,
+                            document_title=doc_title,
+                            user_email=user['email'],
+                            user_name=user['full_name'],
+                            user_role=user['role'],
+                            action_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            details=f"Upload file: {uploaded_file.name}",
+                            department_id=user['department_id']
+                        )
+
+                        st.success(f"✅ Dokumen berhasil diupload! (ID: {doc_id})")
+
+                        # Notifikasi ke Kepala Bidang jika perlu approval
+                        if status == STATUS_PENDING:
+                            approvers = get_approvers_for_department(user['department_id'])
+                            for approver in approvers:
+                                create_notification(
+                                    user_email=approver[1],
+                                    title="📋 Dokumen Perlu Approval",
+                                    message=f"{user['full_name']} mengupload dokumen '{doc_title}' yang perlu Anda approve.",
+                                    link=f"?doc_id={doc_id}"
+                                )
+
+                        # Kirim email
+                        if send_email and recipient_email:
+                            with st.spinner("Mengirim email..."):
+                                success, message = send_pdf_email(
+                                    recipient_email, filepath,
+                                    uploaded_file.name, user['full_name'], doc_title
+                                )
+                                if success:
+                                    st.success(f"📧 {message}")
+                                else:
+                                    st.warning(f"⚠️ {message}")
+
+
+    # ============================================================
+    # MAIN CONTENT
+    # ============================================================
+    # Import halaman berdasarkan role
+    if admin_mode:
+        from pages.admin import dashboard as admin_dashboard
+        from pages.admin import users as admin_users
+        from pages.admin import departments as admin_departments
+        from pages.admin import categories as admin_categories
+        from pages.admin import audit_log as admin_audit_log
+
+        if st.session_state.page == "dashboard":
+            admin_dashboard.render(user)
+        elif st.session_state.page == "all_docs":
+            admin_dashboard.render_all_docs(user)
+        elif st.session_state.page == "approvals":
+            admin_dashboard.render_approvals(user)
+        elif st.session_state.page == "users":
+            admin_users.render(user)
+        elif st.session_state.page == "departments":
+            admin_departments.render(user)
+        elif st.session_state.page == "categories":
+            admin_categories.render(user)
+        elif st.session_state.page == "audit_log":
+            admin_audit_log.render(user)
+
+    elif kabid_mode:
+        from pages.user import dashboard as user_dashboard
+        from pages.user import my_docs as user_my_docs
+        from pages.user import approvals as user_approvals
+
+        if st.session_state.page == "dashboard":
+            user_dashboard.render(user)
+        elif st.session_state.page == "dept_docs":
+            user_dashboard.render_dept_docs(user)
+        elif st.session_state.page == "approvals":
+            user_approvals.render(user)
+        elif st.session_state.page == "my_docs":
+            user_my_docs.render(user)
+
     else:
-        st.info("📭 Belum ada dokumen yang terupload. Mulai upload dokumen pertama Anda!")
+        from pages.user import dashboard as user_dashboard
+        from pages.user import my_docs as user_my_docs
+        from pages.user import notifications as user_notifications
+
+        if st.session_state.page == "dashboard":
+            user_dashboard.render(user)
+        elif st.session_state.page == "my_docs":
+            user_my_docs.render(user)
+        elif st.session_state.page == "notifications":
+            user_notifications.render(user)

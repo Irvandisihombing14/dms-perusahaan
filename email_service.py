@@ -1,5 +1,5 @@
 """
-Modul Email Service - Mengirim email dengan attachment PDF
+Modul Email Service - DMS PNS
 """
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -9,14 +9,8 @@ from email import encoders
 from config import get_email_config
 
 
-def send_pdf_email(recipient_email, pdf_filepath, pdf_filename,
-                   uploader_name, doc_title):
-    """
-    Kirim email dengan attachment PDF
-
-    Returns:
-        tuple: (success: bool, message: str)
-    """
+def send_email(recipient_email, subject, html_body, attachment_path=None, attachment_name=None):
+    """Kirim email dengan atau tanpa attachment"""
     config = get_email_config()
 
     if not config["SENDER_EMAIL"] or not config["SENDER_PASSWORD"]:
@@ -26,69 +20,23 @@ def send_pdf_email(recipient_email, pdf_filepath, pdf_filename,
         msg = MIMEMultipart()
         msg['From'] = config["SENDER_EMAIL"]
         msg['To'] = recipient_email
-        msg['Subject'] = f"📄 Dokumen Baru: {doc_title}"
-
-        # Body email HTML
-        html_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;
-                        border: 1px solid #ddd; border-radius: 8px;">
-                <h2 style="color: #FF4B4B;">📂 {config['APP_NAME']}</h2>
-                <hr style="border: 1px solid #eee;">
-
-                <p>Halo,</p>
-
-                <p>Dokumen baru telah berhasil diunggah ke sistem:</p>
-
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                    <tr>
-                        <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">
-                            Judul Dokumen:
-                        </td>
-                        <td style="padding: 8px;">{doc_title}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">
-                            Nama File:
-                        </td>
-                        <td style="padding: 8px;">{pdf_filename}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">
-                            Diunggah oleh:
-                        </td>
-                        <td style="padding: 8px;">{uploader_name}</td>
-                    </tr>
-                </table>
-
-                <p><strong>📎 Dokumen terlampir dalam email ini.</strong></p>
-
-                <hr style="border: 1px solid #eee;">
-                <p style="font-size: 12px; color: #888;">
-                    Email ini dikirim otomatis oleh {config['APP_NAME']}.<br>
-                    Jangan balas email ini.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
+        msg['Subject'] = subject
 
         msg.attach(MIMEText(html_body, 'html'))
 
-        # Attach PDF
-        with open(pdf_filepath, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
+        # Attach file jika ada
+        if attachment_path and attachment_name:
+            with open(attachment_path, "rb") as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
 
-        encoders.encode_base64(part)
-        part.add_header(
-            'Content-Disposition',
-            f'attachment; filename="{pdf_filename}"'
-        )
-        msg.attach(part)
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename="{attachment_name}"'
+            )
+            msg.attach(part)
 
-        # Kirim via SMTP
         server = smtplib.SMTP(config["SMTP_SERVER"], config["SMTP_PORT"])
         server.starttls()
         server.login(config["SENDER_EMAIL"], config["SENDER_PASSWORD"])
@@ -99,9 +47,91 @@ def send_pdf_email(recipient_email, pdf_filepath, pdf_filename,
 
     except smtplib.SMTPAuthenticationError:
         return False, "Autentikasi SMTP gagal! Periksa App Password."
-    except smtplib.SMTPException as e:
-        return False, f"Error SMTP: {str(e)}"
-    except FileNotFoundError:
-        return False, "File PDF tidak ditemukan!"
     except Exception as e:
         return False, f"Error: {str(e)}"
+
+
+def send_pdf_email(recipient_email, pdf_filepath, pdf_filename, uploader_name, doc_title):
+    """Kirim email dengan attachment PDF"""
+    config = get_email_config()
+
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;
+                    border: 1px solid #ddd; border-radius: 8px;">
+            <h2 style="color: #1e3a8a;">🏛️ {config['APP_NAME']}</h2>
+            <hr style="border: 1px solid #eee;">
+
+            <p>Halo,</p>
+            <p>Dokumen administrasi PNS baru telah diunggah:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                    <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">Judul:</td>
+                    <td style="padding: 8px;">{doc_title}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">File:</td>
+                    <td style="padding: 8px;">{pdf_filename}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; background: #f9f9f9; font-weight: bold;">Pengunggah:</td>
+                    <td style="padding: 8px;">{uploader_name}</td>
+                </tr>
+            </table>
+
+            <p><strong>📎 Dokumen terlampir dalam email ini.</strong></p>
+
+            <hr style="border: 1px solid #eee;">
+            <p style="font-size: 12px; color: #888;">
+                Email otomatis dari {config['APP_NAME']}.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
+    return send_email(recipient_email, f"📄 Dokumen Baru: {doc_title}",
+                     html_body, pdf_filepath, pdf_filename)
+
+
+def send_approval_notification(recipient_email, doc_title, status, approver_name="", reason=""):
+    """Kirim notifikasi approval/rejection"""
+    config = get_email_config()
+
+    if status == "approved":
+        subject = f"✅ Dokumen Disetujui: {doc_title}"
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;
+                        border: 1px solid #ddd; border-radius: 8px;">
+                <h2 style="color: #28a745;">✅ Dokumen Disetujui</h2>
+                <p>Halo,</p>
+                <p>Dokumen <strong>{doc_title}</strong> telah <strong>disetujui</strong> oleh {approver_name}.</p>
+                <hr style="border: 1px solid #eee;">
+                <p style="font-size: 12px; color: #888;">Email otomatis dari {config['APP_NAME']}.</p>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        subject = f"❌ Dokumen Ditolak: {doc_title}"
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;
+                        border: 1px solid #ddd; border-radius: 8px;">
+                <h2 style="color: #dc3545;">❌ Dokumen Ditolak</h2>
+                <p>Halo,</p>
+                <p>Dokumen <strong>{doc_title}</strong> telah <strong>ditolak</strong> oleh {approver_name}.</p>
+                <p><strong>Alasan:</strong> {reason}</p>
+                <hr style="border: 1px solid #eee;">
+                <p style="font-size: 12px; color: #888;">Email otomatis dari {config['APP_NAME']}.</p>
+            </div>
+        </body>
+        </html>
+        """
+
+    return send_email(recipient_email, subject, html_body)

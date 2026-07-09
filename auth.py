@@ -1,9 +1,10 @@
 """
-Modul Autentikasi - Login, Register, dan Password Hashing
+Modul Autentikasi - DMS PNS
 """
 import hashlib
 import secrets
 from database import create_user, get_user_by_email
+from config import ROLE_PNS
 
 
 def hash_password(password, salt=None):
@@ -15,7 +16,7 @@ def hash_password(password, salt=None):
 
 
 def verify_password(password, stored_hash):
-    """Verifikasi password dengan hash yang tersimpan"""
+    """Verifikasi password"""
     try:
         salt, hash_value = stored_hash.split('$')
         password_hash = hashlib.sha256((salt + password).encode()).hexdigest()
@@ -24,10 +25,10 @@ def verify_password(password, stored_hash):
         return False
 
 
-def register(email, password, full_name, department):
+def register(email, password, full_name, nip, department_id, role=ROLE_PNS):
     """Registrasi user baru"""
     if not email or not password or not full_name:
-        return False, "Semua field harus diisi!"
+        return False, "Email, password, dan nama harus diisi!"
 
     if len(password) < 6:
         return False, "Password minimal 6 karakter!"
@@ -36,7 +37,8 @@ def register(email, password, full_name, department):
         return False, "Format email tidak valid!"
 
     password_hash = hash_password(password)
-    return create_user(email.lower().strip(), password_hash, full_name, department)
+    return create_user(email.lower().strip(), password_hash, full_name,
+                      nip, department_id, role)
 
 
 def login(email, password):
@@ -49,7 +51,10 @@ def login(email, password):
     if user is None:
         return None, "Email tidak terdaftar!"
 
-    # user: (id, email, password_hash, full_name, department, created_at)
+    # user: (id, email, password_hash, full_name, nip, department_id, role, is_active, created_at, department_name)
+    if user[7] == 0:  # is_active
+        return None, "Akun Anda telah dinonaktifkan. Hubungi admin."
+
     stored_hash = user[2]
 
     if verify_password(password, stored_hash):
@@ -57,9 +62,28 @@ def login(email, password):
             'id': user[0],
             'email': user[1],
             'full_name': user[3],
-            'department': user[4],
-            'created_at': user[5]
+            'nip': user[4],
+            'department_id': user[5],
+            'department_name': user[9] if user[9] else "Belum diatur",
+            'role': user[6],
+            'is_active': user[7],
+            'created_at': user[8]
         }
         return user_data, "Login berhasil!"
     else:
         return None, "Password salah!"
+
+
+def is_admin(user_data):
+    """Cek apakah user adalah admin"""
+    return user_data and user_data.get('role') == 'admin'
+
+
+def is_kepala_bidang(user_data):
+    """Cek apakah user adalah Kepala Bidang"""
+    return user_data and user_data.get('role') == 'kepala_bidang'
+
+
+def can_approve(user_data):
+    """Cek apakah user bisa approve dokumen"""
+    return user_data and user_data.get('role') in ['admin', 'kepala_bidang']

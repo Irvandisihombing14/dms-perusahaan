@@ -1,0 +1,5 @@
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = "emailanda@gmail.com"
+SENDER_PASSWORD = "abcd efgh ijkl mnop"
+APP_NAME = "DMS Perusahaan Saya"
