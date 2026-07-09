@@ -1,5 +1,5 @@
 """
-Aplikasi Utama - DMS Administrasi PNS (Single File)
+Aplikasi Utama - DMS Administrasi PNS (Single File Version)
 Semua fitur: Admin, Kepala Bidang, PNS, Upload, Email, Approval, Audit Log, Notifikasi
 """
 import streamlit as st
@@ -27,25 +27,44 @@ from database import (
 from auth import register, login, is_admin, is_kepala_bidang, hash_password
 from email_service import send_pdf_email, send_approval_notification
 
+# ============================================================
+# INISIALISASI
+# ============================================================
 init_folders()
 init_db()
 
-st.set_page_config(page_title="DMS Administrasi PNS", page_icon="🏛️", layout="wide")
+st.set_page_config(
+    page_title="DMS Administrasi PNS",
+    page_icon="🏛️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# ============================================================
+# CUSTOM CSS
+# ============================================================
 st.markdown("""
 <style>
-.main-header { font-size: 2.5rem; color: #1e3a8a; text-align: center; margin-bottom: 1rem; }
-.sub-header { font-size: 1.2rem; color: #666; text-align: center; margin-bottom: 2rem; }
+    .main-header {
+        font-size: 2.5rem;
+        color: #1e3a8a;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .sub-header {
+        font-size: 1.2rem;
+        color: #666;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_data = None
-    st.session_state.page = "dashboard"
-
-
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 def format_size(size_bytes):
+    """Format ukuran file"""
     if not size_bytes:
         return "-"
     if size_bytes < 1024:
@@ -57,6 +76,7 @@ def format_size(size_bytes):
 
 
 def format_date(date_str):
+    """Format tanggal"""
     if not date_str:
         return "-"
     try:
@@ -64,6 +84,15 @@ def format_date(date_str):
         return dt.strftime("%d/%m/%Y %H:%M")
     except Exception:
         return date_str
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_data = None
+    st.session_state.page = "dashboard"
 
 
 # ============================================================
@@ -106,7 +135,11 @@ if not st.session_state.logged_in:
                     r_nip = st.text_input("🆔 NIP (Nomor Induk Pegawai)")
                     r_email = st.text_input("📧 Email Instansi")
                     r_pass = st.text_input("🔑 Password (min. 6 karakter)", type="password")
-                    r_dept = st.selectbox("🏢 Bidang/Departemen", [(d[1], d[0]) for d in departments], format_func=lambda x: x[0])
+                    r_dept = st.selectbox(
+                        "🏢 Bidang/Departemen",
+                        [(d[1], d[0]) for d in departments],
+                        format_func=lambda x: x[0]
+                    )
                     submit_register = st.form_submit_button("Daftar", type="primary", use_container_width=True)
                     if submit_register:
                         with st.spinner("Mendaftarkan akun..."):
@@ -125,6 +158,9 @@ else:
     admin_mode = is_admin(user)
     kabid_mode = is_kepala_bidang(user)
 
+    # ============================================================
+    # SIDEBAR
+    # ============================================================
     with st.sidebar:
         st.markdown("### 👤 Profil")
         st.success(f"**{user['full_name']}**")
@@ -148,55 +184,39 @@ else:
 
         if admin_mode:
             if st.button("📊 Dashboard Admin", use_container_width=True):
-                st.session_state.page = "dashboard"
-                st.rerun()
+                st.session_state.page = "dashboard"; st.rerun()
             if st.button("📁 Semua Dokumen", use_container_width=True):
-                st.session_state.page = "all_docs"
-                st.rerun()
+                st.session_state.page = "all_docs"; st.rerun()
             if st.button("⏳ Approval Pending", use_container_width=True):
-                st.session_state.page = "approvals"
-                st.rerun()
+                st.session_state.page = "approvals"; st.rerun()
             if st.button("👥 Manajemen User", use_container_width=True):
-                st.session_state.page = "users"
-                st.rerun()
+                st.session_state.page = "users"; st.rerun()
             if st.button("🏢 Manajemen Bidang", use_container_width=True):
-                st.session_state.page = "departments"
-                st.rerun()
+                st.session_state.page = "departments"; st.rerun()
             if st.button("📂 Kategori Dokumen", use_container_width=True):
-                st.session_state.page = "categories"
-                st.rerun()
+                st.session_state.page = "categories"; st.rerun()
             if st.button("📜 Audit Log", use_container_width=True):
-                st.session_state.page = "audit_log"
-                st.rerun()
+                st.session_state.page = "audit_log"; st.rerun()
             if st.button("🔔 Notifikasi", use_container_width=True):
-                st.session_state.page = "notifications"
-                st.rerun()
+                st.session_state.page = "notifications"; st.rerun()
         elif kabid_mode:
             if st.button("📊 Dashboard", use_container_width=True):
-                st.session_state.page = "dashboard"
-                st.rerun()
+                st.session_state.page = "dashboard"; st.rerun()
             if st.button("📁 Dokumen Bidang", use_container_width=True):
-                st.session_state.page = "dept_docs"
-                st.rerun()
+                st.session_state.page = "dept_docs"; st.rerun()
             if st.button("⏳ Approval Pending", use_container_width=True):
-                st.session_state.page = "approvals"
-                st.rerun()
+                st.session_state.page = "approvals"; st.rerun()
             if st.button("📄 Dokumen Saya", use_container_width=True):
-                st.session_state.page = "my_docs"
-                st.rerun()
+                st.session_state.page = "my_docs"; st.rerun()
             if st.button("🔔 Notifikasi", use_container_width=True):
-                st.session_state.page = "notifications"
-                st.rerun()
+                st.session_state.page = "notifications"; st.rerun()
         else:
             if st.button("📊 Dashboard Saya", use_container_width=True):
-                st.session_state.page = "dashboard"
-                st.rerun()
+                st.session_state.page = "dashboard"; st.rerun()
             if st.button("📄 Dokumen Saya", use_container_width=True):
-                st.session_state.page = "my_docs"
-                st.rerun()
+                st.session_state.page = "my_docs"; st.rerun()
             if st.button("🔔 Notifikasi", use_container_width=True):
-                st.session_state.page = "notifications"
-                st.rerun()
+                st.session_state.page = "notifications"; st.rerun()
 
         st.markdown("---")
         st.markdown("### 📤 Upload Dokumen")
@@ -211,11 +231,19 @@ else:
                 uploaded_file = st.file_uploader("Pilih File PDF", type=['pdf'])
                 doc_title = st.text_input("Judul Dokumen", placeholder="Contoh: Laporan Kinerja Triwulan I")
                 doc_desc = st.text_area("Deskripsi (Opsional)", height=80)
-                doc_category = st.selectbox("Kategori", [(c[1], c[0]) for c in categories], format_func=lambda x: x[0])
+                doc_category = st.selectbox(
+                    "Kategori",
+                    [(c[1], c[0]) for c in categories],
+                    format_func=lambda x: x[0]
+                )
                 doc_tags = st.text_input("Tag (pisahkan dengan koma)", placeholder="laporan, kinerja, 2026")
                 doc_expiry = st.date_input("Tanggal Kadaluarsa (Opsional)", min_value=datetime.now(), value=None)
                 send_email = st.checkbox("Kirim notifikasi via email", value=True)
-                recipient_email = st.text_input("Email Penerima", value=user['email'] if send_email else "", disabled=not send_email)
+                recipient_email = st.text_input(
+                    "Email Penerima",
+                    value=user['email'] if send_email else "",
+                    disabled=not send_email
+                )
                 submit_upload = st.form_submit_button("📤 Upload", type="primary", use_container_width=True)
 
                 if submit_upload:
@@ -238,20 +266,31 @@ else:
                         expiry_date = doc_expiry.strftime("%Y-%m-%d") if doc_expiry else None
 
                         doc_id = create_document(
-                            title=doc_title, original_filename=uploaded_file.name,
-                            filepath=filepath, department_id=user['department_id'],
-                            category_id=doc_category[1], status=status, tags=doc_tags,
-                            description=doc_desc, expiry_date=expiry_date,
-                            uploaded_by_email=user['email'], uploaded_by_name=user['full_name'],
+                            title=doc_title,
+                            original_filename=uploaded_file.name,
+                            filepath=filepath,
+                            department_id=user['department_id'],
+                            category_id=doc_category[1],
+                            status=status,
+                            tags=doc_tags,
+                            description=doc_desc,
+                            expiry_date=expiry_date,
+                            uploaded_by_email=user['email'],
+                            uploaded_by_name=user['full_name'],
                             upload_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             file_size=uploaded_file.size
                         )
 
                         create_audit_log(
-                            action="CREATE", document_id=doc_id, document_title=doc_title,
-                            user_email=user['email'], user_name=user['full_name'],
-                            user_role=user['role'], action_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            details=f"Upload file: {uploaded_file.name}", department_id=user['department_id']
+                            action="CREATE",
+                            document_id=doc_id,
+                            document_title=doc_title,
+                            user_email=user['email'],
+                            user_name=user['full_name'],
+                            user_role=user['role'],
+                            action_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            details=f"Upload file: {uploaded_file.name}",
+                            department_id=user['department_id']
                         )
 
                         st.success(f"✅ Dokumen berhasil diupload! (ID: {doc_id})")
@@ -260,19 +299,22 @@ else:
                             approvers = get_approvers_for_department(user['department_id'])
                             for approver in approvers:
                                 create_notification(
-                                    user_email=approver[1], title="📋 Dokumen Perlu Approval",
+                                    user_email=approver[1],
+                                    title="📋 Dokumen Perlu Approval",
                                     message=f"{user['full_name']} mengupload dokumen '{doc_title}' yang perlu Anda approve."
                                 )
 
                         if send_email and recipient_email:
                             with st.spinner("Mengirim email..."):
                                 success, message = send_pdf_email(
-                                    recipient_email, filepath, uploaded_file.name, user['full_name'], doc_title
+                                    recipient_email, filepath,
+                                    uploaded_file.name, user['full_name'], doc_title
                                 )
                                 if success:
                                     st.success(f"📧 {message}")
                                 else:
                                     st.warning(f"⚠️ {message}")
+
     # ============================================================
     # HALAMAN: DASHBOARD
     # ============================================================
@@ -311,7 +353,8 @@ else:
             recent_logs = get_all_audit_logs()[:10]
             if recent_logs:
                 log_df = pd.DataFrame(recent_logs, columns=[
-                    'ID', 'Aksi', 'DocID', 'Judul', 'Email', 'Nama', 'Role', 'Tanggal', 'Detail', 'DeptID', 'DeptName'
+                    'ID', 'Aksi', 'DocID', 'Judul', 'Email', 'Nama', 'Role',
+                    'Tanggal', 'Detail', 'DeptID', 'DeptName'
                 ])
                 display_log = log_df[['Aksi', 'Judul', 'Nama', 'DeptName', 'Tanggal', 'Detail']].copy()
                 display_log['Tanggal'] = display_log['Tanggal'].apply(format_date)
@@ -419,7 +462,12 @@ else:
                 doc_info = get_document_by_id(doc_id)
                 if doc_info and os.path.exists(doc_info[3]):
                     with open(doc_info[3], "rb") as file:
-                        st.download_button(label=f"📥 Download: {doc_info[2]}", data=file.read(), file_name=doc_info[2], mime="application/pdf")
+                        st.download_button(
+                            label=f"📥 Download: {doc_info[2]}",
+                            data=file.read(),
+                            file_name=doc_info[2],
+                            mime="application/pdf"
+                        )
         else:
             st.info("Belum ada dokumen.")
 
@@ -453,7 +501,13 @@ else:
                     with col2:
                         if os.path.exists(doc[3]):
                             with open(doc[3], "rb") as file:
-                                st.download_button("📥 Download PDF", data=file.read(), file_name=doc[2], mime="application/pdf", use_container_width=True)
+                                st.download_button(
+                                    "📥 Download PDF",
+                                    data=file.read(),
+                                    file_name=doc[2],
+                                    mime="application/pdf",
+                                    use_container_width=True
+                                )
 
                     st.markdown("---")
                     col_a1, col_a2 = st.columns(2)
@@ -476,7 +530,11 @@ else:
                             st.success("✅ Dokumen berhasil di-approve!")
                             st.rerun()
                     with col_a2:
-                        rejection_reason = st.text_input("Alasan penolakan", key=f"reason_{doc[0]}", placeholder="Jelaskan alasan penolakan...")
+                        rejection_reason = st.text_input(
+                            "Alasan penolakan",
+                            key=f"reason_{doc[0]}",
+                            placeholder="Jelaskan alasan penolakan..."
+                        )
                         if st.button(f"❌ Reject", key=f"reject_{doc[0]}", use_container_width=True):
                             if rejection_reason:
                                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -512,7 +570,12 @@ else:
         with col_f1:
             search_term = st.text_input("🔍 Cari Dokumen")
         with col_f2:
-            status_filter = st.multiselect("📊 Filter Status", options=list(STATUS_LABELS.keys()), default=list(STATUS_LABELS.keys()), format_func=lambda x: STATUS_LABELS[x])
+            status_filter = st.multiselect(
+                "📊 Filter Status",
+                options=list(STATUS_LABELS.keys()),
+                default=list(STATUS_LABELS.keys()),
+                format_func=lambda x: STATUS_LABELS[x]
+            )
         with col_f3:
             sort_order = st.radio("⬆️⬇️", ["Terbaru", "Terlama"], horizontal=True)
 
@@ -611,7 +674,15 @@ else:
                         st.markdown("**📥 Download**")
                         if os.path.exists(doc_info[3]):
                             with open(doc_info[3], "rb") as file:
-                                st.download_button(label="📥 Download PDF", data=file.read(), file_name=doc_info[2], mime="application/pdf", type="primary", use_container_width=True, key=f"download_{doc_info[0]}")
+                                st.download_button(
+                                    label="📥 Download PDF",
+                                    data=file.read(),
+                                    file_name=doc_info[2],
+                                    mime="application/pdf",
+                                    type="primary",
+                                    use_container_width=True,
+                                    key=f"download_{doc_info[0]}"
+                                )
                         else:
                             st.error("❌ File tidak ditemukan!")
 
@@ -682,7 +753,12 @@ else:
                 doc_info = get_document_by_id(doc_id)
                 if doc_info and os.path.exists(doc_info[3]):
                     with open(doc_info[3], "rb") as file:
-                        st.download_button(label=f"📥 Download: {doc_info[2]}", data=file.read(), file_name=doc_info[2], mime="application/pdf")
+                        st.download_button(
+                            label=f"📥 Download: {doc_info[2]}",
+                            data=file.read(),
+                            file_name=doc_info[2],
+                            mime="application/pdf"
+                        )
         else:
             st.info("Belum ada dokumen di bidang ini.")
 
@@ -709,8 +785,16 @@ else:
                         new_email = st.text_input("📧 Email")
                     with col2:
                         new_password = st.text_input("🔑 Password (min. 6 karakter)", type="password")
-                        new_dept = st.selectbox("🏢 Bidang", [(d[1], d[0]) for d in departments], format_func=lambda x: x[0])
-                        new_role = st.selectbox("🎭 Role", ['pns', 'kepala_bidang', 'admin'], format_func=lambda x: ROLE_LABELS.get(x, x))
+                        new_dept = st.selectbox(
+                            "🏢 Bidang",
+                            [(d[1], d[0]) for d in departments],
+                            format_func=lambda x: x[0]
+                        )
+                        new_role = st.selectbox(
+                            "🎭 Role",
+                            ['pns', 'kepala_bidang', 'admin'],
+                            format_func=lambda x: ROLE_LABELS.get(x, x)
+                        )
                     submit_add = st.form_submit_button("➕ Buat User", type="primary", use_container_width=True)
                     if submit_add:
                         if not all([new_name, new_email, new_password]):
@@ -719,7 +803,10 @@ else:
                             st.error("❌ Password minimal 6 karakter!")
                         else:
                             password_hash = hash_password(new_password)
-                            success, message = create_user(new_email.lower().strip(), password_hash, new_name, new_nip, new_dept[1], new_role)
+                            success, message = create_user(
+                                new_email.lower().strip(), password_hash, new_name,
+                                new_nip, new_dept[1], new_role
+                            )
                             if success:
                                 create_audit_log(
                                     action="CREATE_USER", document_id=None, document_title=f"User: {new_name}",
@@ -769,7 +856,11 @@ else:
                         current_dept_idx = dept_names.index(user_info['Bidang']) if user_info['Bidang'] in dept_names else 0
                         edit_dept = st.selectbox("Bidang", dept_names, index=current_dept_idx)
                         roles = ['pns', 'kepala_bidang', 'admin']
-                        edit_role = st.selectbox("Role", roles, index=roles.index(user_info['Role']), format_func=lambda x: ROLE_LABELS.get(x, x))
+                        edit_role = st.selectbox(
+                            "Role", roles,
+                            index=roles.index(user_info['Role']),
+                            format_func=lambda x: ROLE_LABELS.get(x, x)
+                        )
                         edit_active = st.checkbox("Aktif", value=user_info['Status'] == 1)
                         submit_edit = st.form_submit_button("💾 Simpan Perubahan", type="primary")
                         if submit_edit:
@@ -926,7 +1017,10 @@ else:
             with st.form("add_cat_form"):
                 cat_name = st.text_input("Nama Kategori", placeholder="Contoh: SK (Surat Keputusan)")
                 cat_desc = st.text_area("Deskripsi (Opsional)", height=100)
-                require_approval = st.checkbox("⚠️ Kategori ini memerlukan approval Kepala Bidang", help="Jika dicentang, dokumen dengan kategori ini harus di-approve")
+                require_approval = st.checkbox(
+                    "⚠️ Kategori ini memerlukan approval Kepala Bidang",
+                    help="Jika dicentang, dokumen dengan kategori ini harus di-approve"
+                )
                 submit_add = st.form_submit_button("➕ Tambah Kategori", type="primary", use_container_width=True)
                 if submit_add:
                     if not cat_name:
@@ -1009,13 +1103,23 @@ else:
 
         col_f1, col_f2 = st.columns([1, 1])
         with col_f1:
-            action_filter = st.multiselect("🔍 Filter Aksi", options=["CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT", "CREATE_USER", "UPDATE_USER", "DELETE_USER", "RESET_PASSWORD", "CREATE_DEPARTMENT", "UPDATE_DEPARTMENT", "DELETE_DEPARTMENT", "CREATE_CATEGORY", "UPDATE_CATEGORY", "DELETE_CATEGORY"], default=["CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT"])
+            action_filter = st.multiselect(
+                "🔍 Filter Aksi",
+                options=["CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT",
+                         "CREATE_USER", "UPDATE_USER", "DELETE_USER", "RESET_PASSWORD",
+                         "CREATE_DEPARTMENT", "UPDATE_DEPARTMENT", "DELETE_DEPARTMENT",
+                         "CREATE_CATEGORY", "UPDATE_CATEGORY", "DELETE_CATEGORY"],
+                default=["CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT"]
+            )
         with col_f2:
             search_log = st.text_input("🔍 Cari di Log")
 
         all_logs = get_all_audit_logs()
         if all_logs:
-            df = pd.DataFrame(all_logs, columns=['ID', 'Aksi', 'DocID', 'Judul', 'Email', 'Nama', 'Role', 'Tanggal', 'Detail', 'DeptID', 'DeptName'])
+            df = pd.DataFrame(all_logs, columns=[
+                'ID', 'Aksi', 'DocID', 'Judul', 'Email', 'Nama', 'Role',
+                'Tanggal', 'Detail', 'DeptID', 'DeptName'
+            ])
             filtered = df.copy()
             if action_filter:
                 filtered = filtered[filtered['Aksi'].isin(action_filter)]
@@ -1041,7 +1145,12 @@ else:
                     export_filename = f"audit_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
                     export_df.to_excel(export_filename, index=False)
                     with open(export_filename, "rb") as file:
-                        st.download_button("📥 Download Excel", data=file.read(), file_name=export_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        st.download_button(
+                            "📥 Download Excel",
+                            data=file.read(),
+                            file_name=export_filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
             else:
                 st.info("Tidak ada aktivitas yang sesuai dengan filter.")
         else:
@@ -1080,7 +1189,8 @@ else:
                     icon = "🔔"
 
                 st.markdown(f"""
-                <div style="background: {bg_color}; border-left: 4px solid {border_color}; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+                <div style="background: {bg_color}; border-left: 4px solid {border_color};
+                            padding: 15px; margin-bottom: 10px; border-radius: 5px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <h4 style="margin: 0;">{icon} {notif[2]}</h4>
                         <small style="color: #666;">{format_date(notif[6])}</small>
